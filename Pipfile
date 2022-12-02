@@ -1,0 +1,17 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[requires]
+python_version = "3"
+
+[packages]
+cdktf = "~=0.13.3"
+pytest = "*"
+cdktf-cdktf-provider-aws = "*"
+constructs = "*"
+cdktf-cdktf-provider-random = "*"
+
+[dev-packages]
+autopep8 = "*"
