@@ -7,11 +7,16 @@ from shared.apigw import ApiGatewayStack
 from data.rds_postgres import RdsPostgressDbStack
 from apps.synapse import SynapseStack
 
-#### load env config
-region = config('region',default='eu-west-1')
+# load env config
+region = config('region', default='eu-west-1')
 aws_profile = config('aws_profile', default='default')
 tf_state_bucket = config('tf_state_bucket')
 home_ip = config('home_ip')
+key_pair_name = config('key_pair_name', default='my_key_pair')
+apigw_custom_domain = config('apigw_custom_domain', default='example.com')
+acm_cert_domain = config('acm_cert_domain', default='*.example.com')
+private_namespace = config('private_namespace', default='matrix.lan')
+ecs_instance_type = config('ecs_instance_type', default='a1.medium')
 
 #### global configs ####
 provider_config = {
@@ -26,22 +31,21 @@ state_config = {
 }
 
 
-
 #### main app ####
 app = App()
 
 #### shared stacks ####
-vpc_stack = VpcStack(app, "vpc", provider_config, state_config, home_ip, private_namespace="privatier.lan")
+vpc_stack = VpcStack(app, "vpc", provider_config, state_config, home_ip, private_namespace)
 
 ecs_cluster_stack = Ec2EcsClusterStack(app, "ecs-cluster",
                                        provider_config,
                                        state_config,
                                        cluster_config={
                                            "cluster_name": "shared",
-                                           "key_pair_name": "key-pair-main",
+                                           "key_pair_name": key_pair_name,
                                            "vpc": vpc_stack.vpc,
                                            "security_groups": [vpc_stack.vpc_sgroup.id, vpc_stack.ssh_sgroup.id],
-                                           "instance_type": "a1.medium",
+                                           "instance_type": ecs_instance_type,
                                            "desired_capacity": 1,
                                            "min_capacity": 1,
                                            "max_capacity": 1
@@ -54,8 +58,8 @@ apigw_stack = ApiGatewayStack(app, "apigw",
                               api_config={
                                   "security_groups": [vpc_stack.vpc_sgroup.id],
                                   "subnets": Token.as_list(vpc_stack.vpc.public_subnets_output),
-                                  "domain_name": "net.rhizomatic.biz",
-                                  "certificate_name": "*.net.rhizomatic.biz"
+                                  "domain_name": apigw_custom_domain,
+                                  "certificate_name": acm_cert_domain
                               })
 
 #### data stacks ####
