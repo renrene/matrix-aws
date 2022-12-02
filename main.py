@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from decouple import config
 from cdktf import App, Fn, TerraformOutput, Token
 from shared.vpc import VpcStack
 from shared.ecs_cluster import Ec2EcsClusterStack
@@ -6,19 +7,25 @@ from shared.apigw import ApiGatewayStack
 from data.rds_postgres import RdsPostgressDbStack
 from apps.synapse import SynapseStack
 
+#### load env config
+region = config('region',default='eu-west-1')
+aws_profile = config('aws_profile', default='default')
+tf_state_bucket = config('tf_state_bucket')
+home_ip = config('home_ip')
+
 #### global configs ####
 provider_config = {
-    "region": "eu-west-1",
-    "profile": "privatier"
+    "region": region,
+    "profile": aws_profile
 }
 
 state_config = {
-    "region": "eu-west-1",
-    "profile": "privatier",
-    "bucket": "privatier-cdktf-remote-state"
+    "region": region,
+    "profile": aws_profile,
+    "bucket": tf_state_bucket
 }
 
-home_ip = "87.68.196.67/32"
+
 
 #### main app ####
 app = App()

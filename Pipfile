@@ -13,6 +13,7 @@ cdktf-cdktf-provider-aws = "*"
 constructs = "*"
 cdktf-cdktf-provider-random = "*"
 pip = "*"
+python-decouple = "*"
 
 [dev-packages]
 autopep8 = "*"
