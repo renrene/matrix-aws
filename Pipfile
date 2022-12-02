@@ -12,6 +12,7 @@ pytest = "*"
 cdktf-cdktf-provider-aws = "*"
 constructs = "*"
 cdktf-cdktf-provider-random = "*"
+pip = "*"
 
 [dev-packages]
 autopep8 = "*"
