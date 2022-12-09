@@ -1,12 +1,12 @@
 from cdktf import Token, Fn
 from constructs import Construct
 from utils import ExtendedTerraformStack
-from imports.aws.data_aws_ec2_instance_type_offerings import DataAwsEc2InstanceTypeOfferings, DataAwsEc2InstanceTypeOfferingsFilter
-from imports.aws.data_aws_availability_zones import DataAwsAvailabilityZones, DataAwsAvailabilityZonesFilter
+from imports.aws.data_aws_availability_zone import DataAwsAvailabilityZone
 from imports.aws.security_group import SecurityGroup
 from imports.aws.security_group_rule import SecurityGroupRule
 from imports.aws.service_discovery_private_dns_namespace import ServiceDiscoveryPrivateDnsNamespace
 from imports.aws.efs_file_system import EfsFileSystem
+from imports.aws.efs_backup_policy import EfsBackupPolicy
 from imports.aws.efs_mount_target import EfsMountTarget
 from imports.aws.efs_access_point import EfsAccessPoint, EfsAccessPointRootDirectory, EfsAccessPointRootDirectoryCreationInfo, EfsAccessPointPosixUser
 from imports.vpc import Vpc
@@ -31,27 +31,21 @@ class VpcStack(ExtendedTerraformStack):
         self._intEFS()
 
     def _initVPC(self, home_ip: str, private_namespace: str, preferred_instance_type: str):
-        # find available zones for instance type
-        self._azs = DataAwsEc2InstanceTypeOfferings(self, "AvailabilityZones",
-                                                    location_type="availability-zone",
-                                                    filter=[DataAwsEc2InstanceTypeOfferingsFilter(name="instance-type",
-                                                                                                  values=[preferred_instance_type])])
-        
-        # self._azs = DataAwsAvailabilityZones(self, "AvailablityZones",
-        #                                      state="available",
-        #                                      filter=[DataAwsAvailabilityZonesFilter(
-        #                                          name="opt-in-status",
-        #                                          values=["opt-in-not-required"])])
+        # #########################################################################################################
+        # find available zones for instance type, and make them fixed. changes in AZs are destructive and cant be 
+        # ignored by lifecycles.At the time of writing, for Ireland region, a1 instances are available at zones b,c
+        ###########################################################################################################
 
         # set primary zone, for a singleAZ setup
-        self._primary_az = Fn.element(Token.as_list(self._azs.locations), 0)
+        self._primary_az = DataAwsAvailabilityZone(self,"AZ_Primary", name=f'{self._provider.region}b')
+
 
         # create the VPC
         self._vpc = Vpc(self, "shared_vpc",
                         name="shared_vpc",
                         cidr="10.144.0.0/16",
-                        azs=[Fn.element(Token.as_list(self._azs.locations), 0),
-                             Fn.element(Token.as_list(self._azs.locations), 1)],
+                        azs=[f'{self._provider.region}b',
+                             f'{self._provider.region}c'],
                         private_subnets=["10.144.5.0/24", "10.144.6.0/24"],
                         public_subnets=["10.144.0.0/24", "10.144.1.0/24"],
                         database_subnets=["10.144.10.0/24", "10.144.11.0/24"],
@@ -103,9 +97,11 @@ class VpcStack(ExtendedTerraformStack):
 
     def _intEFS(self):
         self._efs = EfsFileSystem(self, "EFS",
-                                  availability_zone_name=self._primary_az,
+                                  availability_zone_name=self._primary_az.name,
                                   creation_token="shared_efs",
                                   encrypted=True)
+
+        EfsBackupPolicy(self,"EFS_Backup", file_system_id=self._efs.id, backup_policy={"status": "ENABLED"})
 
         self._efs_ap_synapse = EfsAccessPoint(self, "EFS_AP_Synapse",
                                               file_system_id=self._efs.id,

@@ -41,6 +41,19 @@ app = App()
 #### shared stacks ####
 vpc_stack = VpcStack(app, "vpc", provider_config, state_config, home_ip, private_namespace, ecs_instance_type)
 
+## API Gateway
+apigw_stack = ApiGatewayStack(app, "apigw",
+                              provider_config,
+                              state_config,
+                              api_config={
+                                  "security_groups": [vpc_stack.vpc_sgroup.id],
+                                  "subnets": Token.as_list(vpc_stack.vpc.public_subnets_output),
+                                  "domain_name": apigw_custom_domain,
+                                  "certificate_name": acm_cert_domain
+                              })
+apigw_stack.add_dependency(vpc_stack)
+
+## ECS Cluster - EC2
 ecs_cluster_stack = Ec2EcsClusterStack(app, "ecs-cluster",
                                        provider_config,
                                        state_config,
@@ -56,21 +69,13 @@ ecs_cluster_stack = Ec2EcsClusterStack(app, "ecs-cluster",
                                        }
                                        )
 
-apigw_stack = ApiGatewayStack(app, "apigw",
-                              provider_config,
-                              state_config,
-                              api_config={
-                                  "security_groups": [vpc_stack.vpc_sgroup.id],
-                                  "subnets": Token.as_list(vpc_stack.vpc.public_subnets_output),
-                                  "domain_name": apigw_custom_domain,
-                                  "certificate_name": acm_cert_domain
-                              })
+ecs_cluster_stack.add_dependency(vpc_stack)
 
 #### data stacks ####
 db_config = {
     "db_name": "main-db",
     "vpc_id": vpc_stack.vpc.vpc_id_output,
-    "preferred_az": vpc_stack.primary_availability_zone,
+    "preferred_az": vpc_stack.primary_availability_zone.name,
     "db_subnet_group_name": Token.as_string(vpc_stack.vpc.database_subnet_group_name_output),
     "sgroup_source_id": vpc_stack.vpc_sgroup.id,
     "engine_version": "13.6",
@@ -86,6 +91,8 @@ rds_postrgres_db = RdsPostgressDbStack(app, "rds-postgres",
                                        state_config,
                                        db_config,
                                        home_ip)
+
+rds_postrgres_db.add_dependency(vpc_stack)
 
 #### apps stacks ####
 service_config = {
@@ -116,7 +123,8 @@ synapse_service = SynapseStack(app, "synapse-service",
                              provider_config,
                              state_config,
                              service_config)
-
+synapse_service.add_dependency(ecs_cluster_stack)
+synapse_service.add_dependency(rds_postrgres_db)
 
 #### synth - end of code ####
 app.synth()

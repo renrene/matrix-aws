@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-from cdktf import Fn, TerraformOutput, Token
+from datetime import datetime
+from cdktf import Fn, TerraformOutput, Token, TerraformResourceLifecycle
 from constructs import Construct
-
+from imports.aws.data_aws_db_snapshot import DataAwsDbSnapshot
 from imports.aws.db_instance import DbInstance
 from imports.aws.security_group import SecurityGroup
 from imports.aws.security_group_rule import SecurityGroupRule
@@ -30,8 +31,15 @@ class RdsPostgressDbStack(ExtendedTerraformStack):
         self._init_security(db_config["vpc_id"], db_config["db_name"], db_config["sgroup_source_id"], home_ip)
 
         # create db instance
+        db_instance_id = f"rds-postgres-{db_config['db_name']}"
+        final_snapshot_str_time = datetime.isoformat(datetime.now()).replace(":", "-")[1:-7]
+        snapshot = f"rds-snapshot-{db_config['db_name']}-{final_snapshot_str_time}"
+        last_db_snapshot = DataAwsDbSnapshot(self, "Last_DB_Snapshot",
+                                             most_recent=True,
+                                             db_instance_identifier=db_instance_id)
+        print("Last snapshot found: ", last_db_snapshot.id)
         self._db_instance = DbInstance(self, "DBInstance",
-                                       identifier=f"rds-postgres-{db_config['db_name']}",
+                                       identifier=db_instance_id,
                                        engine="postgres",
                                        engine_version=db_config["engine_version"],
                                        allocated_storage=db_config["storage"],
@@ -42,10 +50,13 @@ class RdsPostgressDbStack(ExtendedTerraformStack):
                                        username=self._admin_username,
                                        password=self._admin_pass.result,
                                        skip_final_snapshot=False,
-                                       final_snapshot_identifier=f"rds-snapshot-{db_config['db_name']}",
-                                       snapshot_identifier=f"rds-snapshot-{db_config['db_name']}",
+                                       final_snapshot_identifier=snapshot,
+                                       snapshot_identifier=last_db_snapshot.id,
                                        instance_class=db_config["instance_class"],
-                                       vpc_security_group_ids=[self._db_sg.id]
+                                       vpc_security_group_ids=[self._db_sg.id],
+                                       lifecycle=TerraformResourceLifecycle(
+                                           ignore_changes=["final_snapshot_identifier", "snapshot_identifier"]
+                                       )
                                        )
 
         self._initServiceDiscovery(db_config["namespace_id"], db_config["db_name"])
