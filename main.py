@@ -18,6 +18,10 @@ acm_cert_domain = config('acm_cert_domain', default='*.example.com')
 private_namespace = config('private_namespace', default='matrix.lan')
 ecs_instance_type = config('ecs_instance_type', default='a1.medium')
 
+
+print("aws_profile: ",aws_profile)
+print("bucket: ",tf_state_bucket)
+
 #### global configs ####
 provider_config = {
     "region": region,
@@ -35,7 +39,7 @@ state_config = {
 app = App()
 
 #### shared stacks ####
-vpc_stack = VpcStack(app, "vpc", provider_config, state_config, home_ip, private_namespace)
+vpc_stack = VpcStack(app, "vpc", provider_config, state_config, home_ip, private_namespace, ecs_instance_type)
 
 ecs_cluster_stack = Ec2EcsClusterStack(app, "ecs-cluster",
                                        provider_config,
@@ -43,7 +47,7 @@ ecs_cluster_stack = Ec2EcsClusterStack(app, "ecs-cluster",
                                        cluster_config={
                                            "cluster_name": "shared",
                                            "key_pair_name": key_pair_name,
-                                           "vpc": vpc_stack.vpc,
+                                           "subnets_ids": [vpc_stack.primary_public_subnet_id],
                                            "security_groups": [vpc_stack.vpc_sgroup.id, vpc_stack.ssh_sgroup.id],
                                            "instance_type": ecs_instance_type,
                                            "desired_capacity": 1,
@@ -66,11 +70,13 @@ apigw_stack = ApiGatewayStack(app, "apigw",
 db_config = {
     "db_name": "main-db",
     "vpc_id": vpc_stack.vpc.vpc_id_output,
+    "preferred_az": vpc_stack.primary_availability_zone,
+    "db_subnet_group_name": Token.as_string(vpc_stack.vpc.database_subnet_group_name_output),
     "sgroup_source_id": vpc_stack.vpc_sgroup.id,
     "engine_version": "13.6",
     "storage": 5,
     "max_storage": 10,
-    "db_subnet_group_name": Token.as_string(vpc_stack.vpc.database_subnet_group_name_output),
+    
     "instance_class": "db.t4g.micro",
     "namespace_id": vpc_stack.namespace.id
 }
@@ -84,9 +90,9 @@ rds_postrgres_db = RdsPostgressDbStack(app, "rds-postgres",
 #### apps stacks ####
 service_config = {
     "service_name": "synapse",
-    "subnets_ids": Token.as_list(vpc_stack.vpc.public_subnets_output),
+    "subnets_ids": [vpc_stack.primary_public_subnet_id],
     "sec_group_id": Token.as_string(vpc_stack.vpc_sgroup.id),
-    "image": "public.ecr.aws/nginx/nginx:stable-alpine",
+    "image": "matrixdotorg/synapse",
     "cpu": 128,
     "memory": 128,
     "env_vars": {
@@ -106,7 +112,7 @@ service_config = {
     "mount_path": "/data"
 }
 
-nginx_service = SynapseStack(app, "nginx-service",
+synapse_service = SynapseStack(app, "synapse-service",
                              provider_config,
                              state_config,
                              service_config)

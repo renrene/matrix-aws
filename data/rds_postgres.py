@@ -38,9 +38,12 @@ class RdsPostgressDbStack(ExtendedTerraformStack):
                                        max_allocated_storage=db_config["max_storage"],
                                        copy_tags_to_snapshot=True,
                                        db_subnet_group_name=db_config["db_subnet_group_name"],
+                                       availability_zone=db_config["preferred_az"],
                                        username=self._admin_username,
                                        password=self._admin_pass.result,
-                                       skip_final_snapshot=True,
+                                       skip_final_snapshot=False,
+                                       final_snapshot_identifier=f"rds-snapshot-{db_config['db_name']}",
+                                       snapshot_identifier=f"rds-snapshot-{db_config['db_name']}",
                                        instance_class=db_config["instance_class"],
                                        vpc_security_group_ids=[self._db_sg.id]
                                        )

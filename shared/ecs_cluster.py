@@ -69,7 +69,7 @@ class Ec2EcsClusterStack(ExtendedTerraformStack):
         # Autoscaling Group
         self._as_group = AutoscalingGroup(self, "AutoscalingGroup",
                                     name=f"asg-ecs-cluster-{cluster_name}",
-                                    vpc_zone_identifier=Token.as_list(cluster_config["vpc"].public_subnets_output),
+                                    vpc_zone_identifier=cluster_config["subnets_ids"],
                                     launch_template=AutoscalingGroupLaunchTemplate(id=template.id,
                                                                                    version="$Latest"
                                                                                    ),
