@@ -81,7 +81,8 @@ class EcsServiceStack(ExtendedTerraformStack):
             "name": service_name,
             "image": service_config["image"],
             "cpu": service_config["cpu"],
-            "memory": service_config["memory"],
+            "memory": service_config["memory_hard"],
+            "memoryReservation": service_config["memory_soft"],
             "essential": True,
             "environment": [service_config["env_vars"]],
             "portMapping": [{
@@ -116,7 +117,7 @@ class EcsServiceStack(ExtendedTerraformStack):
                                      family=service_name,
                                      network_mode="awsvpc",
                                      cpu=str(service_config["cpu"]),
-                                     memory=str(service_config["memory"]),
+                                     memory=str(service_config["memory_hard"]),                                     
                                      requires_compatibilities=[service_config["cluster_type"]],
                                      execution_role_arn=self._role_task_execution.arn,
                                      task_role_arn=self._role_task.arn,

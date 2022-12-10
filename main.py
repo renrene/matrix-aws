@@ -101,7 +101,8 @@ service_config = {
     "sec_group_id": Token.as_string(vpc_stack.vpc_sgroup.id),
     "image": "matrixdotorg/synapse",
     "cpu": 128,
-    "memory": 128,
+    "memory_soft": 128,
+    "memory_hard": 1024,
     "env_vars": {
         "name": "varA",
         "value": "valueA"
