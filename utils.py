@@ -85,10 +85,7 @@ class EcsServiceStack(ExtendedTerraformStack):
             "memoryReservation": service_config["memory_soft"],
             "essential": True,
             "environment": [service_config["env_vars"]],
-            "portMapping": [{
-                "protocol": service_config["protocol"],
-                "containerPort": service_config["port"]
-            }],
+            "portMappings": [service_config["port_mappings"]],
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
@@ -107,17 +104,16 @@ class EcsServiceStack(ExtendedTerraformStack):
         }]
 
         efs_volume = EcsTaskDefinitionVolume(name=efs_volume_name,                              efs_volume_configuration=EcsTaskDefinitionVolumeEfsVolumeConfiguration(
-                file_system_id=service_config["efs_id"],                
-                transit_encryption="ENABLED",
-                authorization_config={"access_point_id": service_config["access_point_id"],   "iam": "ENABLED"}
+            file_system_id=service_config["efs_id"],
+            transit_encryption="ENABLED",
+            authorization_config={"access_point_id": service_config["access_point_id"],   "iam": "ENABLED"}
 
-            ))
+        ))
 
         task_tef = EcsTaskDefinition(self, "TaskDef",
                                      family=service_name,
-                                     network_mode="awsvpc",
                                      cpu=str(service_config["cpu"]),
-                                     memory=str(service_config["memory_hard"]),                                     
+                                     memory=str(service_config["memory_hard"]),
                                      requires_compatibilities=[service_config["cluster_type"]],
                                      execution_role_arn=self._role_task_execution.arn,
                                      task_role_arn=self._role_task.arn,
@@ -130,12 +126,10 @@ class EcsServiceStack(ExtendedTerraformStack):
                                        task_definition=task_tef.arn,
                                        launch_type=service_config["cluster_type"],
                                        desired_count=1,
-                                       network_configuration=EcsServiceNetworkConfiguration(
-                                           security_groups=[sg_ecs_id],
-                                           subnets=subnets_ids),
                                        service_registries=EcsServiceServiceRegistries(
                                            registry_arn=self._reg_srv.arn,
-                                           port=service_config["port"])
+                                           container_name=service_name,
+                                           container_port=service_config["port"])
                                        )
 
     def _initIAMRoles(self, service_name: str, log_group_arn: str):
@@ -216,7 +210,7 @@ class EcsServiceStack(ExtendedTerraformStack):
                                                             ttl=15,
                                                             type="SRV")
                                                     ],
-                                                    routing_policy="WEIGHTED"
+                                                    routing_policy="MULTIVALUE"
                                                 ),
                                                 health_check_custom_config=ServiceDiscoveryServiceHealthCheckCustomConfig(
                                                     failure_threshold=1)
@@ -247,6 +241,6 @@ class EcsServiceStack(ExtendedTerraformStack):
     def registry_service(self):
         return self._reg_srv
 
-    @property
-    def ecs_service(self):
-        return self._ecs_service
+    # @property
+    # def ecs_service(self):
+    #     return self._ecs_service

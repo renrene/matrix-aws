@@ -19,8 +19,8 @@ private_namespace = config('private_namespace', default='matrix.lan')
 ecs_instance_type = config('ecs_instance_type', default='a1.medium')
 
 
-print("aws_profile: ",aws_profile)
-print("bucket: ",tf_state_bucket)
+print("aws_profile: ", aws_profile)
+print("bucket: ", tf_state_bucket)
 
 #### global configs ####
 provider_config = {
@@ -41,7 +41,7 @@ app = App()
 #### shared stacks ####
 vpc_stack = VpcStack(app, "vpc", provider_config, state_config, home_ip, private_namespace, ecs_instance_type)
 
-## API Gateway
+# API Gateway
 apigw_stack = ApiGatewayStack(app, "apigw",
                               provider_config,
                               state_config,
@@ -53,7 +53,7 @@ apigw_stack = ApiGatewayStack(app, "apigw",
                               })
 apigw_stack.add_dependency(vpc_stack)
 
-## ECS Cluster - EC2
+# ECS Cluster - EC2
 ecs_cluster_stack = Ec2EcsClusterStack(app, "ecs-cluster",
                                        provider_config,
                                        state_config,
@@ -81,7 +81,7 @@ db_config = {
     "engine_version": "13.6",
     "storage": 5,
     "max_storage": 10,
-    
+
     "instance_class": "db.t4g.micro",
     "namespace_id": vpc_stack.namespace.id
 }
@@ -107,7 +107,11 @@ service_config = {
         "name": "varA",
         "value": "valueA"
     },
-    "protocol": "tcp",
+    "port_mappings": {
+        "protocol": "tcp",
+        "containerPort": 80,
+        "hostPort": 80
+    },
     "port": 80,
     "cluster_type": "EC2",
     "cluster_id": ecs_cluster_stack.cluster.id,
@@ -121,9 +125,9 @@ service_config = {
 }
 
 synapse_service = SynapseStack(app, "synapse-service",
-                             provider_config,
-                             state_config,
-                             service_config)
+                               provider_config,
+                               state_config,
+                               service_config)
 synapse_service.add_dependency(ecs_cluster_stack)
 synapse_service.add_dependency(rds_postrgres_db)
 
